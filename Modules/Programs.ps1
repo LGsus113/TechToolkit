@@ -175,6 +175,10 @@ function Show-ProgramsMenu {
 # INSTALAR PROGRAMA CON WINGET
 # ============================================================
 
+# ============================================================
+# INSTALAR PROGRAMA CON WINGET
+# ============================================================
+
 function Install-TTWinget {
 
     param(
@@ -196,7 +200,9 @@ function Install-TTWinget {
     # COMPROBAR WINGET
     # --------------------------------------------------------
 
-    if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+
+    if (-not $winget) {
 
         Write-Host ""
         Write-Host "[ERROR] winget no esta disponible." `
@@ -218,17 +224,22 @@ function Install-TTWinget {
     # COMPROBAR SI YA ESTA INSTALADO
     # --------------------------------------------------------
 
+    Write-Host ""
     Write-Host "Comprobando si $Name ya esta instalado..." `
         -ForegroundColor DarkGray
 
-    winget list `
+    & winget.exe list `
         --id $Id `
         --exact `
+        --source winget `
         --accept-source-agreements `
+        --disable-interactivity `
         *> $null
 
+    $alreadyInstalled = ($LASTEXITCODE -eq 0)
 
-    if ($LASTEXITCODE -eq 0) {
+
+    if ($alreadyInstalled) {
 
         Write-Host ""
         Write-Host "[OK] $Name ya esta instalado." `
@@ -250,44 +261,74 @@ function Install-TTWinget {
     # --------------------------------------------------------
 
     Write-Host ""
-    Write-Host "Descargando e instalando..." `
+    Write-Host "Descargando e instalando $Name..." `
         -ForegroundColor Cyan
 
     Write-Host ""
 
-
-    winget install `
+    & winget.exe install `
         --id $Id `
         --exact `
+        --source winget `
         --accept-package-agreements `
-        --accept-source-agreements
+        --accept-source-agreements `
+        --disable-interactivity `
+        --silent
+
+    $installExitCode = $LASTEXITCODE
+
+
+    # --------------------------------------------------------
+    # VERIFICAR INSTALACION REAL
+    # --------------------------------------------------------
+
+    Write-Host ""
+    Write-Host "Verificando instalacion..." `
+        -ForegroundColor DarkGray
+
+    Start-Sleep -Seconds 2
+
+    & winget.exe list `
+        --id $Id `
+        --exact `
+        --source winget `
+        --accept-source-agreements `
+        --disable-interactivity `
+        *> $null
+
+    $verified = ($LASTEXITCODE -eq 0)
 
 
     # --------------------------------------------------------
     # RESULTADO
     # --------------------------------------------------------
 
-    if ($LASTEXITCODE -eq 0) {
+    if ($verified) {
 
         Write-Host ""
         Write-Host "[OK] $Name instalado correctamente." `
             -ForegroundColor Green
 
-        Write-Log "Programa instalado: $Name / $Id"
+        Write-Log "Programa instalado y verificado: $Name / $Id"
 
         $success = $true
     }
     else {
 
         Write-Host ""
-        Write-Host "[ERROR] No se pudo instalar $Name." `
+        Write-Host "[ERROR] $Name NO aparece instalado." `
             -ForegroundColor Red
 
-        Write-Host "Codigo de salida: $LASTEXITCODE" `
-            -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "Codigo devuelto por winget: $installExitCode" `
+            -ForegroundColor Yellow
+
+        Write-Host ""
+        Write-Host "Winget termino, pero la instalacion no pudo verificarse." `
+            -ForegroundColor Yellow
 
         Write-Log `
-            "ERROR instalando $Name / $Id / Codigo $LASTEXITCODE"
+            "ERROR instalando $Name / $Id / Codigo $installExitCode"
 
         $success = $false
     }
@@ -296,7 +337,6 @@ function Install-TTWinget {
     if (-not $NoPause) {
         Pause-TT
     }
-
 
     return $success
 }
